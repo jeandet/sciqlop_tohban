@@ -1,0 +1,10 @@
+{
+  "name": "Tohban",
+  "version": "0.1.0",
+  "description": "Review and edit BepiColombo/Mio observation plans (.evt) during Tohban meetings",
+  "authors": [{"name": "Alexis Jeandet", "email": "alexis.jeandet@gmail.com", "organization": "LPP"}],
+  "license": "MIT",
+  "python_dependencies": ["SciQLop>=0.13.0,<0.14.0", "numpy"],
+  "dependencies": [],
+  "disabled": false
+}

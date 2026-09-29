@@ -1,0 +1,28 @@
+# Mission data must never enter this repository: observation plans,
+# SPICE kernels, orbit workbooks, figures. Tests use synthetic inline data.
+*.evt
+*.EVT
+*.tm
+*.bsp
+*.bc
+*.tf
+*.ti
+*.tls
+*.tpc
+*.tsc
+*.xlsx
+*.xls
+*.csv
+*.png
+*.pdf
+*.zip
+data/
+kernels/
+
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+build/
+dist/
+.venv/
