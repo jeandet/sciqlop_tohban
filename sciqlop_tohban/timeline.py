@@ -90,9 +90,9 @@ def lanes(intervals: Iterable[Interval], cadence: float = 60.0) -> list[Lane]:
     """One on/off trace per (instrument, mode); modes of an instrument stack top-down.
 
     simplify: traces are sampled every ``cadence`` seconds because SciQLopPlots
-    line graphs break wherever a step is >1.5x its neighbours' (gap detection)
-    and vanish on NaN. Edges are therefore shown to ``cadence`` resolution; an
-    exact step rendering needs a gap-detection switch on NeoQCP line graphs.
+    line graphs break wherever a step is >1.5x its neighbours' (gap detection),
+    step line styles included. Edges are therefore shown to ``cadence``
+    resolution; exact steps need SciQLop/SciQLopPlots#118.
     """
     spans: dict[str, dict[str, list[tuple[float, float]]]] = defaultdict(lambda: defaultdict(list))
     for interval in intervals:
