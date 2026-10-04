@@ -1,13 +1,16 @@
 from __future__ import annotations
 
-from itertools import groupby
 from pathlib import Path
 
+import numpy as np
 from PySide6.QtWidgets import QFileDialog
 from SciQLop.user_api.plot import PlotPanel, TimeRange, create_plot_panel
 
-from .evt import EvtFile, obs_mode_intervals, pair_intervals, parse
-from .timeline import Lane, lanes
+from .evt import EvtFile, Interval, obs_mode_intervals, pair_intervals, parse
+from .timeline import CATEGORY_ORDER, MODE_COLORS, TimelineData, lane_order, timeline_data
+
+# Labels overflow below ~12 px; 14 px fits ~70 mode rows on a 1080p screen.
+LANE_HEIGHT = 14
 
 
 def read_plan(path: Path) -> EvtFile:
@@ -16,35 +19,35 @@ def read_plan(path: Path) -> EvtFile:
         return parse(handle.read())
 
 
-def plan_lanes(evt: EvtFile) -> list[Lane]:
+def plan_intervals(evt: EvtFile) -> list[Interval]:
     intervals, points = pair_intervals(evt.records)
-    return lanes(intervals + obs_mode_intervals(points, intervals))
+    return intervals + obs_mode_intervals(points, intervals)
 
 
-def _show_whole_plan(panel: PlotPanel, all_lanes: list[Lane]) -> None:
-    start = min(lane.x[0] for lane in all_lanes)
-    stop = max(lane.x[-1] for lane in all_lanes)
+def _epoch_seconds(time: np.datetime64) -> float:
+    return float(time.astype("datetime64[s]").astype(np.int64))
+
+
+def _show_whole_plan(panel: PlotPanel, data: TimelineData) -> None:
+    # Epoch floats: TimeRange does not convert np.datetime64 (SciQLop 0.14.0.dev0).
+    start, stop = _epoch_seconds(data.start.min()), _epoch_seconds(data.stop.max())
     if 0 < panel.zoom_limit_seconds < stop - start:
         panel.zoom_limit_seconds = stop - start
     panel.time_range = TimeRange(start, stop)
 
 
-def _plot_instrument(panel: PlotPanel, instrument: str, instrument_lanes: list[Lane]) -> None:
-    first, *others = instrument_lanes
-    plot, _ = panel.plot_data(first.x, first.y, name=first.mode, colors=[first.color])
-    for lane in others:
-        plot.plot(lane.x, lane.y, name=lane.mode, colors=[lane.color])
-    plot.set_axis_label("y", instrument)
-    plot.set_axis_range("y", 0.5 - len(instrument_lanes), 0.5)
-
-
 def plot_plan(evt: EvtFile) -> PlotPanel:
-    all_lanes = plan_lanes(evt)
+    data = timeline_data(plan_intervals(evt))
     panel = create_plot_panel()
-    for instrument, instrument_lanes in groupby(all_lanes, key=lambda lane: lane.instrument):
-        _plot_instrument(panel, instrument, list(instrument_lanes))
-    if all_lanes:
-        _show_whole_plan(panel, all_lanes)
+    plot, timeline = panel.add_timeline(lane_height=LANE_HEIGHT)
+    plot.legend_visible = False  # every mode row is named at its start
+    timeline.stack = "category"
+    timeline.category_order = list(CATEGORY_ORDER)
+    timeline.set_category_colors(MODE_COLORS)
+    timeline.set_intervals(data.start, data.stop, lane=data.lane, category=data.category)
+    timeline.lanes = lane_order(data.lane)
+    if data.lane:
+        _show_whole_plan(panel, data)
     return panel
 
 
