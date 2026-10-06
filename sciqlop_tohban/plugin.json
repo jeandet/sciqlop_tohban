@@ -1,6 +1,6 @@
 {
   "name": "Tohban",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Review and edit BepiColombo/Mio observation plans (.evt) during Tohban meetings",
   "authors": [{"name": "Alexis Jeandet", "email": "alexis.jeandet@gmail.com", "organization": "LPP"}],
   "license": "MIT",
