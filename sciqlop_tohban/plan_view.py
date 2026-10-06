@@ -50,5 +50,5 @@ class PlanView:
     def show(self, state: ViewState) -> None:
         data = view_data(self._intervals, state)
         self.timeline.stack = None if state.summary else "category"
-        self.timeline.set_intervals(data.start, data.stop, lane=data.lane, category=data.category)
+        self.timeline.set_intervals(data.start, data.stop, lane=data.lane, category=data.category, label=data.label)
         self.timeline.lanes = lane_order(data.lane)

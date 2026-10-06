@@ -109,3 +109,13 @@ def test_view_hides_modes_before_summarizing():
 def test_detailed_view_shows_every_window():
     windows = [Interval("MGF_I", "BASE", h(0), h(2)), Interval("MGF_I", "HKM", h(0), h(1))]
     assert view_data(windows, ViewState(summary=False)).category == ["BASE", "HKM"]
+
+
+def test_summary_bars_are_labelled_with_their_mode():
+    windows = [Interval("MGF_I", "BASE", h(0), h(2)), Interval("MPPE_MIA", "OBS:Mag", h(0), h(1))]
+    assert view_data(windows, ViewState(summary=True)).label == ["BASE", "Mag"]
+
+
+def test_detailed_bars_are_unlabelled_since_rows_carry_the_mode_name():
+    windows = [Interval("MGF_I", "BASE", h(0), h(2))]
+    assert view_data(windows, ViewState(summary=False)).label is None

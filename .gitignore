@@ -14,6 +14,8 @@
 *.xls
 *.csv
 *.png
+# The only image allowed in: the plugin icon.
+!sciqlop_tohban/resources/bepicolombo.png
 *.pdf
 *.zip
 data/

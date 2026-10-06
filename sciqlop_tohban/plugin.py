@@ -2,11 +2,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from PySide6.QtGui import QAction, QIcon
 from PySide6.QtWidgets import QFileDialog
 
 from .evt import EvtFile, Interval, obs_mode_intervals, pair_intervals, parse
 from .filter_panel import FilterPanel
 from .plan_view import PlanView
+from .resources import ICON_PATH
 
 
 def read_plan(path: Path) -> EvtFile:
@@ -31,7 +33,11 @@ class TohbanPlugin:
     def __init__(self, main_window):
         self._main_window = main_window
         self.plans: dict[Path, tuple[EvtFile, PlanView, FilterPanel]] = {}
-        main_window.toolsMenu.addAction("Open Tohban observation plan…", self.open_plan)
+        self.open_action = QAction(QIcon(str(ICON_PATH)), "Open Tohban observation plan…", main_window)
+        self.open_action.setToolTip("Open a Mio observation plan (.evt) as a timeline")
+        self.open_action.triggered.connect(self.open_plan)
+        main_window.toolsMenu.addAction(self.open_action)
+        main_window.toolBar.addAction(self.open_action)
 
     def open_plan(self) -> None:
         name, _ = QFileDialog.getOpenFileName(
@@ -42,7 +48,7 @@ class TohbanPlugin:
             evt = read_plan(path)
             view, filters = plot_plan(evt)
             filters.setWindowTitle(f"Tohban: {path.name}")
-            self._main_window.add_side_pan(filters)
+            self._main_window.add_side_pan(filters, icon=str(ICON_PATH))
             self.plans[path] = (evt, view, filters)
 
     async def close(self) -> None:

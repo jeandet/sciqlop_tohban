@@ -23,6 +23,11 @@ Restart SciQLop, then **Tools → Open Tohban observation plan…**.
 The `.evt` core (`sciqlop_tohban.evt`) has no GUI dependency and can be used from a
 notebook: `parse(text)` / `dump(evt)` round-trip a file byte for byte.
 
+## Credits
+
+The toolbar icon is the BepiColombo mission patch, © ESA/JAXA, from
+<https://www.cosmos.esa.int/web/bepicolombo>.
+
 ## Tests
 
 ```bash

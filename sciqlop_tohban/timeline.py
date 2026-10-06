@@ -46,6 +46,7 @@ class TimelineData:
     stop: np.ndarray
     lane: list[str]
     category: list[str]
+    label: list[str] | None = None
 
 
 def is_obs(interval: Interval) -> bool:
@@ -62,11 +63,14 @@ def _lane(interval: Interval, summary: bool) -> str:
 
 def timeline_data(intervals: Iterable[Interval], summary: bool = False) -> TimelineData:
     rows = sorted(intervals, key=lambda i: i.start)
+    category = [display_mode(i.mode) for i in rows]
     return TimelineData(
         start=np.array([i.start for i in rows], dtype="datetime64[s]"),
         stop=np.array([i.stop for i in rows], dtype="datetime64[s]"),
         lane=[_lane(i, summary) for i in rows],
-        category=[display_mode(i.mode) for i in rows],
+        category=category,
+        # A summary row mixes modes, so each bar names its own; detailed rows are already named.
+        label=category if summary else None,
     )
 
 

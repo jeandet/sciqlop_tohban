@@ -16,4 +16,4 @@ sciqlop_tohban = "sciqlop_tohban"
 include = ["sciqlop_tohban*"]
 
 [tool.setuptools.package-data]
-sciqlop_tohban = ["plugin.json"]
+sciqlop_tohban = ["plugin.json", "resources/*.png"]
