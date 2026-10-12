@@ -3,7 +3,9 @@ import numpy as np
 from sciqlop_tohban.evt import Interval
 from sciqlop_tohban.timeline import (
     CATEGORY_ORDER,
+    OFF,
     ViewState,
+    highest_mode_at,
     lane_order,
     select,
     summarize,
@@ -119,3 +121,14 @@ def test_summary_bars_are_labelled_with_their_mode():
 def test_detailed_bars_are_unlabelled_since_rows_carry_the_mode_name():
     windows = [Interval("MGF_I", "BASE", h(0), h(2))]
     assert view_data(windows, ViewState(summary=False)).label is None
+
+
+def test_highest_mode_at_picks_the_top_priority_power_mode_across_instruments():
+    windows = [
+        Interval("MGF_I", "BASE", h(0), h(3)),
+        Interval("MPPE_MEA", "HKM", h(1), h(2)),
+        Interval("DPU", "M_HKM", h(1.5), h(1.75)),
+        Interval("MPPE_MIA", "OBS:Mag", h(0), h(4)),
+    ]
+    times = np.array([h(0.5), h(1), h(1.6), h(2), h(3), h(3.5)])
+    assert highest_mode_at(times, windows).tolist() == ["BASE", "HKM", "M_HKM", "BASE", OFF, OFF]

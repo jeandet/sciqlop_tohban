@@ -36,6 +36,8 @@ MODE_COLORS = {
 CATEGORY_ORDER = tuple(MODE_COLORS)
 # Highest first; the default of the original quicklook script.
 MODE_PRIORITY = ("M_HKM", "L_HKM", "HKM", "MM", "LM", "BASE")
+OFF = "OFF"
+OFF_COLOR = "#d1d5db"
 OBS_PREFIX = "OBS:"
 OBS_LANE_SUFFIX = " OBS"
 
@@ -128,6 +130,24 @@ def summarize(intervals: Iterable[Interval]) -> list[Interval]:
             power[interval.instrument].append(interval)
     spans = [span for instrument, windows in power.items() for span in _highest_mode_spans(instrument, windows)]
     return sorted(spans + obs, key=lambda i: (i.start, is_obs(i)))
+
+
+def _active(time: np.ndarray, windows: list[Interval]) -> np.ndarray:
+    starts = np.sort([w.start for w in windows])
+    stops = np.sort([w.stop for w in windows])
+    return np.searchsorted(starts, time, side="right") > np.searchsorted(stops, time, side="right")
+
+
+def highest_mode_at(time: np.ndarray, intervals: Iterable[Interval]) -> np.ndarray:
+    """Highest-priority power mode active at each time, over all instruments, or OFF."""
+    by_mode: dict[str, list[Interval]] = defaultdict(list)
+    for interval in intervals:
+        if not is_obs(interval):
+            by_mode[interval.mode].append(interval)
+    result = np.full(len(time), OFF, dtype=object)
+    for mode in sorted(by_mode, key=_priority):  # lowest first, so higher modes overwrite
+        result[_active(time, by_mode[mode])] = mode
+    return result
 
 
 def select(intervals: Iterable[Interval], hidden_instruments: set[str], hidden_modes: set[str]) -> list[Interval]:
