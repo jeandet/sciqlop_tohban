@@ -27,7 +27,8 @@ Once a plan is open, the plugin samples MIO and MPO every 5 minutes over the pla
 - under the timeline: the expected MIO/MPO region, the distance to Mercury, the
   distance to the MSO X axis next to the magnetopause and bow shock at the same X,
   and the MIO–MPO separation;
-- a **Tohban trajectory** panel: MIO in MSO X–Z and in its orbit plane, coloured
+- a **Tohban trajectory** panel: the plan folded onto one MIO orbit (hours since
+  apoapsis, with apoapses found from the SPICE distance), then MIO in MSO X–Z and in its orbit plane, coloured
   by the highest active operation mode, with MPO, hourly marks and the boundaries;
 - a **Tohban MSASI** panel: the field of view in MSO X–Z, and its footprint on a
   10 R_M shell.

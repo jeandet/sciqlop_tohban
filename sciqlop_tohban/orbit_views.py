@@ -28,6 +28,7 @@ from .magnetosphere import (
     plane_section,
     region_runs,
 )
+from .phase import HOUR, apoapses, clip, folded_bars
 from .timeline import MODE_COLORS, MODE_PRIORITY, OFF, OFF_COLOR, highest_mode_at
 from .trajectory import fov_on_shell, hourly, lon_lat, mode_tracks, polylines
 
@@ -145,6 +146,27 @@ class TrajectoryPlot:
         _set(self.bow_shock, bow_shock)
 
 
+class PhasePlot:
+    """Shown intervals folded onto one MIO orbit: one row per summary lane, x = hours since apoapsis."""
+
+    BAR_WIDTH = 8
+
+    def __init__(self, panel: PlotPanel, eph: Ephemeris):
+        self.apoapses = apoapses(eph.time, eph.mio_radius)
+        self.plot = _xy_plot(panel, "hours since MIO apoapsis", "", equal_aspect=False)
+        self.bars = {mode: _curve(self.plot, mode, color, width=self.BAR_WIDTH) for mode, color in MODE_COLORS.items()}
+        # Same colours as the trajectory legend below; this one would hide the bars.
+        self.plot.legend_visible = False
+
+    def update(self, intervals: list[Interval], start: np.datetime64, stop: np.datetime64) -> None:
+        rows, bars = folded_bars(clip(intervals, start, stop), self.apoapses)
+        for mode, graph in self.bars.items():
+            graph.set_data(*bars.get(mode, _EMPTY))
+        self.plot.set_axis_tick_labels("y", {-float(index): lane for index, lane in enumerate(rows)})
+        if len(self.apoapses):
+            self.plot.set_axis_range("x", 0.0, float(np.max(np.diff(self.apoapses)) / HOUR))
+
+
 def _fov_label(time: np.datetime64) -> str:
     return f"FoV {str(time.astype('datetime64[m]')).replace('T', ' ')}"
 
@@ -190,6 +212,7 @@ class OrbitViews:
         self._intervals = intervals
         self._plan_panel = plan_panel
         self.trajectory_panel = create_plot_panel("Tohban trajectory")
+        self.phase = PhasePlot(self.trajectory_panel, eph)
         self.trajectories = [TrajectoryPlot(self.trajectory_panel, p) for p in (MSO_XZ, ORBIT_PLANE)]
         self.msasi_panel = create_plot_panel("Tohban MSASI")
         self.msasi = MsasiPlots(self.msasi_panel)
@@ -205,10 +228,12 @@ class OrbitViews:
         if not alive(self._plan_panel):
             return
         shown = self._plan_panel.time_range
-        eph = self._eph.window(_datetime64(shown.start()), _datetime64(shown.stop()))
+        start, stop = _datetime64(shown.start()), _datetime64(shown.stop())
+        eph = self._eph.window(start, stop)
         if len(eph.time) < 2:
             return
         if alive(self.trajectory_panel):
+            self.phase.update(self._intervals, start, stop)
             modes = highest_mode_at(eph.time, self._intervals)
             for plot in self.trajectories:
                 plot.update(eph, modes)
