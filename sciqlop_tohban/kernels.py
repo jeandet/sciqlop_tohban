@@ -26,9 +26,9 @@ _WANTED = re.compile(
     r"|ik/bc_mmo_msasi"
     r"|sclk/bc_mmo"
     r"|ck/bc_mmo_sc_"
-    # Every MIO ephemeris: ESA renames them per mission phase (mlt, now jlp + separation).
     r"|spk/de\d+s"
     r"|spk/bc_sci"
+    # Every MIO ephemeris: ESA renames them per mission phase (mlt, now jlp + separation).
     r"|spk/bc_mmo_"
     # MPO through 2031. bc_mpo_flp (269 MB) only repeats mlt and slt_extension.
     r"|spk/bc_mpo_(fcp|mlt|slt_extension))"

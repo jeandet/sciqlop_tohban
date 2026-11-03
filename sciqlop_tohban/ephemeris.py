@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 from dataclasses import dataclass, fields
 from pathlib import Path
+from typing import Iterator
 
 import numpy as np
 
@@ -11,23 +13,21 @@ STEP = np.timedelta64(5, "m")
 MSASI_FOV_ID = -68401
 FRAME = "BC_MSO"
 OBSERVER = "MERCURY"
-LABELS = {"MMO": "MIO", "MPO": "MPO"}
 
 
 class MissingEphemeris(RuntimeError):
-    """SPICE has no coverage for a body over the requested window."""
+    """SPICE has no coverage over the requested window."""
 
 
-def _state(spice, body: str, et: np.ndarray, start: np.datetime64, stop: np.datetime64) -> np.ndarray:
+@contextmanager
+def coverage(what: str, start: np.datetime64, stop: np.datetime64) -> Iterator[None]:
+    from spiceypy.utils.exceptions import SpiceyError
+
     try:
-        return np.asarray(spice.spkezr(body, et, FRAME, "NONE", OBSERVER)[0])
-    except Exception as error:  # spiceypy errors derive straight from Exception, with no common base
+        yield
+    except SpiceyError as error:
         # spiceypy keeps the readable one-liner in 'long' and a banner in str().
-        detail = getattr(error, "long", "") or str(error)
-        raise MissingEphemeris(
-            f"no {LABELS[body]} ephemeris between {start} and {stop}: "
-            f"ESA's plan may list a kernel this plugin does not fetch ({detail})"
-        ) from error
+        raise MissingEphemeris(f"no {what} between {start} and {stop} in ESA's current plan ({error.long})") from error
 
 
 @dataclass(frozen=True)
@@ -81,10 +81,13 @@ def sample(metakernel: Path, start: np.datetime64, stop: np.datetime64, step: np
     try:
         # simplify: one str2et, then UTC offsets; off by a second across a leap second.
         et = spice.str2et(str(time[0])) + (time - time[0]).astype(float)
-        mio_state = _state(spice, "MMO", et, start, stop)
-        mpo = _state(spice, "MPO", et, start, stop)[:, :3]
+        with coverage("MIO ephemeris", start, stop):
+            mio_state = np.asarray(spice.spkezr("MMO", et, FRAME, "NONE", OBSERVER)[0])
+        with coverage("MPO ephemeris", start, stop):
+            mpo = np.asarray(spice.spkpos("MPO", et, FRAME, "NONE", OBSERVER)[0])
         _, fov_frame, boresight, _, corners = spice.getfov(MSASI_FOV_ID, 10)
-        rotation = np.asarray([spice.pxform(fov_frame, FRAME, t) for t in et])
+        with coverage("MSASI pointing", start, stop):
+            rotation = np.asarray([spice.pxform(fov_frame, FRAME, t) for t in et])
     finally:
         spice.kclear()
     return Ephemeris(

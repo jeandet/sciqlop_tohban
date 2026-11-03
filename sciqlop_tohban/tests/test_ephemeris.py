@@ -1,7 +1,8 @@
 import numpy as np
 import pytest
+from spiceypy.utils.exceptions import SpiceCKINSUFFDATA
 
-from sciqlop_tohban.ephemeris import Ephemeris, MissingEphemeris, _state, sample, shell_footprint
+from sciqlop_tohban.ephemeris import Ephemeris, MissingEphemeris, coverage, sample, shell_footprint
 from sciqlop_tohban.kernels import CACHE
 
 
@@ -24,13 +25,19 @@ def test_separation_and_radii():
     assert eph.mio_radius.tolist() == pytest.approx([np.sqrt(12)] * 2)
 
 
-def test_missing_coverage_names_the_body_and_the_window():
-    class NoEphemeris:
-        def spkezr(self, *arguments):
-            raise RuntimeError("SPICE(SPKINSUFFDATA): ... -68 (MMO) at 2029 JUN 01")
+JUNE = np.datetime64("2029-06-01"), np.datetime64("2029-07-01")
 
-    with pytest.raises(MissingEphemeris, match="no MIO ephemeris between 2029-06-01 and 2029-07-01"):
-        _state(NoEphemeris(), "MMO", np.array([0.0]), np.datetime64("2029-06-01"), np.datetime64("2029-07-01"))
+
+def test_missing_coverage_names_what_is_missing_and_the_window():
+    with pytest.raises(MissingEphemeris, match="no MSASI pointing between 2029-06-01 and 2029-07-01 in ESA's current plan"):
+        with coverage("MSASI pointing", *JUNE):
+            raise SpiceCKINSUFFDATA(long="Insufficient pointing data")
+
+
+def test_bugs_are_not_reported_as_missing_coverage():
+    with pytest.raises(KeyError):
+        with coverage("MIO ephemeris", *JUNE):
+            raise KeyError("not a SPICE error")
 
 
 def test_shell_footprint_is_where_a_ray_leaves_the_sphere():
