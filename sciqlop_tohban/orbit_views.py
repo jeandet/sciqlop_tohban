@@ -28,8 +28,8 @@ from .magnetosphere import (
     plane_section,
     region_runs,
 )
-from .phase import HOUR, apoapses, clip, folded_bars
-from .timeline import MODE_COLORS, MODE_PRIORITY, OFF, OFF_COLOR, highest_mode_at
+from .phase import HOUR, apoapses, clip, folded_bars, power_and_obs
+from .timeline import MODE_COLORS, MODE_PRIORITY, OFF, OFF_COLOR, STATE_COLORS, View, highest_mode_at
 from .trajectory import fov_on_shell, hourly, lon_lat, mode_tracks, polylines
 
 MIO_COLOR = "#7c3aed"
@@ -49,6 +49,8 @@ FOV_COLORS = (  # viridis, early to late in the shown range
 )
 # Coalesce the burst of range changes of a pan or zoom into one redraw.
 REDRAW_DELAY_MS = 150
+# Relative heights of the folded power and OBS plots: ~16 instrument rows against ~4.
+POWER_PHASE_STRETCH = 3
 _EMPTY = (np.empty(0), np.empty(0))
 
 
@@ -147,14 +149,15 @@ class TrajectoryPlot:
 
 
 class PhasePlot:
-    """Shown intervals folded onto one MIO orbit: one row per summary lane, x = hours since apoapsis."""
+    """Intervals folded onto one MIO orbit: one row per instrument, x = hours since apoapsis."""
 
     BAR_WIDTH = 8
 
-    def __init__(self, panel: PlotPanel, eph: Ephemeris):
-        self.apoapses = apoapses(eph.time, eph.mio_radius)
-        self.plot = _xy_plot(panel, "hours since MIO apoapsis", "", equal_aspect=False)
-        self.bars = {mode: _curve(self.plot, mode, color, width=self.BAR_WIDTH) for mode, color in MODE_COLORS.items()}
+    def __init__(self, panel: PlotPanel, apo: np.ndarray, y_label: str, x_label: str = ""):
+        self.apoapses = apo
+        self.plot = _xy_plot(panel, x_label, y_label, equal_aspect=False)
+        colors = MODE_COLORS | STATE_COLORS
+        self.bars = {mode: _curve(self.plot, mode, color, width=self.BAR_WIDTH) for mode, color in colors.items()}
         # Same colours as the trajectory legend below; this one would hide the bars.
         self.plot.legend_visible = False
 
@@ -163,6 +166,8 @@ class PhasePlot:
         for mode, graph in self.bars.items():
             graph.set_data(*bars.get(mode, _EMPTY))
         self.plot.set_axis_tick_labels("y", {-float(index): lane for index, lane in enumerate(rows)})
+        if rows:
+            self.plot.set_axis_range("y", 0.5 - len(rows), 0.5)
         if len(self.apoapses):
             self.plot.set_axis_range("x", 0.0, float(np.max(np.diff(self.apoapses)) / HOUR))
 
@@ -207,15 +212,21 @@ class MsasiPlots:
 class OrbitViews:
     """Trajectory and MSASI panels following the plan panel's time range."""
 
-    def __init__(self, plan_panel: PlotPanel, eph: Ephemeris, intervals: list[Interval]):
+    def __init__(self, plan_panel: PlotPanel, eph: Ephemeris, intervals: list[Interval], view: View):
         self._eph = eph
         self._intervals = intervals
+        self._view = view
         self._plan_panel = plan_panel
         self.trajectory_panel = create_plot_panel("Tohban trajectory")
         # Each group sits in its own sub-panel: stacked next to a bare plot, a sub-panel keeps its small
         # natural height while the plot takes the rest.
         self.phase_panel = self.trajectory_panel.add_sub_panel(Orientation.Vertical)
-        self.phase = PhasePlot(self.phase_panel, eph)
+        apo = apoapses(eph.time, eph.mio_radius)
+        self.power_phase = PhasePlot(self.phase_panel, apo, "power")
+        self.obs_phase = PhasePlot(self.phase_panel, apo, "OBS mode", "hours since MIO apoapsis")
+        self.phase_panel._impl.set_plot_stretch(self.power_phase.plot._impl, POWER_PHASE_STRETCH)
+        # Without its own stretch, Qt shrinks the OBS plot to its minimum height.
+        self.phase_panel._impl.set_plot_stretch(self.obs_phase.plot._impl, 1)
         self.tracks_panel = self.trajectory_panel.add_sub_panel(Orientation.Horizontal)
         self.trajectories = [TrajectoryPlot(self.tracks_panel, p) for p in (MSO_XZ, ORBIT_PLANE)]
         self.msasi_panel = create_plot_panel("Tohban MSASI")
@@ -223,9 +234,12 @@ class OrbitViews:
         self._timer = QTimer(singleShot=True, interval=REDRAW_DELAY_MS, timeout=self.redraw)
         plan_panel._impl.time_range_changed.connect(lambda _: self._timer.start())
         self.redraw()
+        # The rescale SciQLopPlots runs on a plot's first data overrides the row range set by redraw.
+        self._timer.start()
 
-    def set_intervals(self, intervals: list[Interval]) -> None:
+    def set_intervals(self, intervals: list[Interval], view: View) -> None:
         self._intervals = intervals
+        self._view = view
         self.redraw()
 
     def redraw(self) -> None:
@@ -237,7 +251,9 @@ class OrbitViews:
         if len(eph.time) < 2:
             return
         if alive(self.phase_panel):
-            self.phase.update(self._intervals, start, stop)
+            power, obs = power_and_obs(self._intervals, self._view)
+            self.power_phase.update(power, start, stop)
+            self.obs_phase.update(obs, start, stop)
         if alive(self.tracks_panel):
             modes = highest_mode_at(eph.time, self._intervals)
             for plot in self.trajectories:

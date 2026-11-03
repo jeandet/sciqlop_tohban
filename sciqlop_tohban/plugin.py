@@ -66,7 +66,7 @@ class OpenPlan:
     def show(self, state: ViewState) -> None:
         self.view.show(state)
         if self.orbit is not None:
-            self.orbit.set_intervals(select(self.intervals, state.hidden_instruments, state.hidden_modes))
+            self.orbit.set_intervals(select(self.intervals, state.hidden_instruments, state.hidden_modes), state.view)
 
     def _load_ephemeris(self) -> None:
         self.view.plot.overlay.show("Loading SPICE ephemeris (first time: downloading ~230 MB of ESA kernels)…",
@@ -84,7 +84,9 @@ class OpenPlan:
         self.view.plot.overlay.clear()
         add_distance_plots(self.view.panel, self.view.plot, eph)
         state = self.filters.state()
-        self.orbit = OrbitViews(self.view.panel, eph, select(self.intervals, state.hidden_instruments, state.hidden_modes))
+        self.orbit = OrbitViews(
+            self.view.panel, eph, select(self.intervals, state.hidden_instruments, state.hidden_modes), state.view
+        )
 
 
 class TohbanPlugin:

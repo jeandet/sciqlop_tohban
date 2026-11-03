@@ -2,7 +2,8 @@ import numpy as np
 import pytest
 
 from sciqlop_tohban.evt import Interval
-from sciqlop_tohban.phase import apoapses, clip, fold, folded_bars
+from sciqlop_tohban.phase import apoapses, clip, fold, folded_bars, power_and_obs
+from sciqlop_tohban.timeline import ON, SCIENCE, View
 
 T0 = np.datetime64("2030-01-01T00:00:00")
 
@@ -49,3 +50,21 @@ def test_folded_bars_put_each_lane_on_its_row_coloured_by_mode():
 def test_clip_keeps_the_overlapping_part_of_each_interval():
     intervals = [Interval("DPU", "LM", *hours(0, 4)), Interval("DPU", "HKM", *hours(5, 6))]
     assert clip(intervals, *hours(2, 5)) == [Interval("DPU", "LM", *hours(2, 4))]
+
+
+def test_power_and_obs_rows_are_split_and_power_follows_the_view():
+    intervals = [
+        Interval("MGF_I", "BASE", *hours(0, 4)),
+        Interval("MGF_I", "LM", *hours(1, 2)),
+        Interval("MPPE_MIA", "OBS:Mag", *hours(0, 1)),
+    ]
+    power, obs = power_and_obs(intervals, View.STATE)
+    assert [i.mode for i in power] == [ON, SCIENCE, ON]
+    assert obs == [Interval("MPPE_MIA", "Mag", *hours(0, 1))]
+
+
+def test_power_rows_show_the_highest_mode_outside_the_state_view():
+    intervals = [Interval("MGF_I", "BASE", *hours(0, 4)), Interval("MGF_I", "LM", *hours(1, 2))]
+    for view in (View.SUMMARY, View.DETAILED):
+        power, _ = power_and_obs(intervals, view)
+        assert [i.mode for i in power] == ["BASE", "LM", "BASE"]
