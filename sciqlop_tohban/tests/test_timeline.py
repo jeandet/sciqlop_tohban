@@ -4,6 +4,9 @@ from sciqlop_tohban.evt import Interval
 from sciqlop_tohban.timeline import (
     CATEGORY_ORDER,
     OFF,
+    ON,
+    SCIENCE,
+    View,
     ViewState,
     highest_mode_at,
     lane_order,
@@ -104,23 +107,23 @@ def test_select_hides_instruments_and_modes():
 
 def test_view_hides_modes_before_summarizing():
     windows = [Interval("MGF_I", "BASE", h(0), h(2)), Interval("MGF_I", "HKM", h(0), h(1))]
-    data = view_data(windows, ViewState(summary=True, hidden_modes=frozenset({"HKM"})))
+    data = view_data(windows, ViewState(view=View.SUMMARY, hidden_modes=frozenset({"HKM"})))
     assert data.category == ["BASE"] and data.start.tolist() == [h(0)] and data.stop.tolist() == [h(2)]
 
 
 def test_detailed_view_shows_every_window():
     windows = [Interval("MGF_I", "BASE", h(0), h(2)), Interval("MGF_I", "HKM", h(0), h(1))]
-    assert view_data(windows, ViewState(summary=False)).category == ["BASE", "HKM"]
+    assert view_data(windows, ViewState(view=View.DETAILED)).category == ["BASE", "HKM"]
 
 
 def test_summary_bars_are_labelled_with_their_mode():
     windows = [Interval("MGF_I", "BASE", h(0), h(2)), Interval("MPPE_MIA", "OBS:Mag", h(0), h(1))]
-    assert view_data(windows, ViewState(summary=True)).label == ["BASE", "Mag"]
+    assert view_data(windows, ViewState(view=View.SUMMARY)).label == ["BASE", "Mag"]
 
 
 def test_detailed_bars_are_unlabelled_since_rows_carry_the_mode_name():
     windows = [Interval("MGF_I", "BASE", h(0), h(2))]
-    assert view_data(windows, ViewState(summary=False)).label is None
+    assert view_data(windows, ViewState(view=View.DETAILED)).label is None
 
 
 def test_highest_mode_at_picks_the_top_priority_power_mode_across_instruments():
@@ -132,3 +135,25 @@ def test_highest_mode_at_picks_the_top_priority_power_mode_across_instruments():
     ]
     times = np.array([h(0.5), h(1), h(1.6), h(2), h(3), h(3.5)])
     assert highest_mode_at(times, windows).tolist() == ["BASE", "HKM", "M_HKM", "BASE", OFF, OFF]
+
+
+def test_state_view_tells_science_from_powered_on_and_drops_obs_lanes():
+    windows = [
+        Interval("MGF_I", "BASE", h(0), h(3)),
+        Interval("MGF_I", "LM", h(1), h(2)),
+        Interval("MPPE_MIA", "OBS:Mag", h(0), h(1)),
+    ]
+    data = view_data(windows, ViewState(view=View.STATE))
+    assert data.category == [ON, SCIENCE, ON]
+    assert data.start.tolist() == [h(0), h(1), h(2)] and data.stop.tolist() == [h(1), h(2), h(3)]
+    assert set(data.lane) == {"MGF_I"}
+
+
+def test_state_view_merges_back_to_back_science_modes():
+    windows = [
+        Interval("DPU", "BASE", h(0), h(3)),
+        Interval("DPU", "L_HKM", h(0), h(1)),
+        Interval("DPU", "M_HKM", h(1), h(3)),
+    ]
+    data = view_data(windows, ViewState(view=View.STATE))
+    assert data.category == [SCIENCE] and data.stop.tolist() == [h(3)]

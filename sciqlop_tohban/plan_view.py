@@ -6,7 +6,7 @@ import numpy as np
 from SciQLop.user_api.plot import PlotPanel, TimeRange, create_plot_panel
 
 from .evt import Interval
-from .timeline import CATEGORY_ORDER, MODE_COLORS, ViewState, display_mode, lane_order, view_data
+from .timeline import CATEGORY_ORDER, MODE_COLORS, STATE_COLORS, View, ViewState, display_mode, lane_order, view_data
 
 # Labels overflow below ~12 px; 14 px fits the ~70 rows of the detailed view on 1080p.
 LANE_HEIGHT = 14
@@ -32,8 +32,8 @@ class PlanView:
         self.panel = create_plot_panel()
         self.plot, self.timeline = self.panel.add_timeline(lane_height=LANE_HEIGHT)
         self.plot.legend_visible = False  # lanes and mode rows are named on the plot
-        self.timeline.category_order = list(CATEGORY_ORDER)
-        self.timeline.set_category_colors(MODE_COLORS)
+        self.timeline.category_order = list(CATEGORY_ORDER) + list(STATE_COLORS)
+        self.timeline.set_category_colors(MODE_COLORS | STATE_COLORS)
         self.show(ViewState())
         if intervals:
             _show_first_session(self.panel, intervals)
@@ -49,6 +49,6 @@ class PlanView:
 
     def show(self, state: ViewState) -> None:
         data = view_data(self._intervals, state)
-        self.timeline.stack = None if state.summary else "category"
+        self.timeline.stack = "category" if state.view is View.DETAILED else None
         self.timeline.set_intervals(data.start, data.stop, lane=data.lane, category=data.category, label=data.label)
         self.timeline.lanes = lane_order(data.lane)

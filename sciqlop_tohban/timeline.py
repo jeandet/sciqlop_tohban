@@ -3,13 +3,15 @@
 Detailed view: one lane per instrument, modes stacked one fixed sub-row each.
 Summary view: one lane per instrument showing its highest active mode, plus an
 "<instrument> OBS" lane for observation modes.
+State view: one lane per instrument, either powered ON or taking SCIENCE data.
 """
 
 from __future__ import annotations
 
 from collections import Counter, defaultdict
-from dataclasses import dataclass
-from typing import Iterable
+from dataclasses import dataclass, replace
+from enum import Enum
+from typing import Callable, Iterable
 
 import numpy as np
 
@@ -36,6 +38,10 @@ MODE_COLORS = {
 CATEGORY_ORDER = tuple(MODE_COLORS)
 # Highest first; the default of the original quicklook script.
 MODE_PRIORITY = ("M_HKM", "L_HKM", "HKM", "MM", "LM", "BASE")
+ON = "ON"
+SCIENCE = "SCIENCE"
+# Above BASE every power mode collects science data; BASE alone is just powered on.
+STATE_COLORS = {ON: MODE_COLORS["BASE"], SCIENCE: "#16a34a"}
 OFF = "OFF"
 OFF_COLOR = "#d1d5db"
 OBS_PREFIX = "OBS:"
@@ -93,7 +99,7 @@ def _priority(mode: str) -> int:
     return -MODE_PRIORITY.index(mode) if mode in MODE_PRIORITY else -len(MODE_PRIORITY)
 
 
-def _highest_mode_spans(instrument: str, windows: list[Interval]) -> list[Interval]:
+def _highest_mode_spans(instrument: str, windows: list[Interval], priority: Callable[[str], int] = _priority) -> list[Interval]:
     """Sweep the window edges, keeping the highest-priority active mode between them."""
     edges: dict[np.datetime64, list[tuple[str, int]]] = defaultdict(list)
     for window in windows:
@@ -108,7 +114,7 @@ def _highest_mode_spans(instrument: str, windows: list[Interval]) -> list[Interv
         modes = [mode for mode, count in active.items() if count > 0]
         if not modes:
             continue
-        mode = max(modes, key=_priority)
+        mode = max(modes, key=priority)
         if spans and spans[-1].mode == mode and spans[-1].stop == time:
             spans[-1] = Interval(instrument, mode, spans[-1].start, next_time)
         else:
@@ -130,6 +136,24 @@ def summarize(intervals: Iterable[Interval]) -> list[Interval]:
             power[interval.instrument].append(interval)
     spans = [span for instrument, windows in power.items() for span in _highest_mode_spans(instrument, windows)]
     return sorted(spans + obs, key=lambda i: (i.start, is_obs(i)))
+
+
+def _as_state(interval: Interval) -> Interval:
+    return replace(interval, mode=ON if interval.mode == "BASE" else SCIENCE)
+
+
+def states(intervals: Iterable[Interval]) -> list[Interval]:
+    """Per instrument: SCIENCE while any mode above BASE is active, else ON."""
+    power: dict[str, list[Interval]] = defaultdict(list)
+    for interval in intervals:
+        if not is_obs(interval):
+            power[interval.instrument].append(_as_state(interval))
+    spans = [
+        span
+        for instrument, windows in power.items()
+        for span in _highest_mode_spans(instrument, windows, priority=lambda mode: mode == SCIENCE)
+    ]
+    return sorted(spans, key=lambda i: i.start)
 
 
 def _active(time: np.ndarray, windows: list[Interval]) -> np.ndarray:
@@ -157,9 +181,15 @@ def select(intervals: Iterable[Interval], hidden_instruments: set[str], hidden_m
     ]
 
 
+class View(str, Enum):
+    SUMMARY = "Summary: highest mode per instrument"
+    STATE = "ON / science per instrument"
+    DETAILED = "Detailed: every mode"
+
+
 @dataclass(frozen=True)
 class ViewState:
-    summary: bool = True
+    view: View = View.SUMMARY
     hidden_instruments: frozenset[str] = frozenset()
     hidden_modes: frozenset[str] = frozenset()
 
@@ -167,4 +197,5 @@ class ViewState:
 def view_data(intervals: Iterable[Interval], state: ViewState) -> TimelineData:
     # Hide first: summarizing first would let a hidden mode mask the modes below it.
     shown = select(intervals, state.hidden_instruments, state.hidden_modes)
-    return timeline_data(summarize(shown) if state.summary else shown, summary=state.summary)
+    reduce = {View.SUMMARY: summarize, View.STATE: states, View.DETAILED: list}[state.view]
+    return timeline_data(reduce(shown), summary=state.view is not View.DETAILED)

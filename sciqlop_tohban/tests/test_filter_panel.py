@@ -7,7 +7,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PySide6.QtCore import Qt  # noqa: E402
 
 from sciqlop_tohban.filter_panel import FilterPanel  # noqa: E402
-from sciqlop_tohban.timeline import ViewState  # noqa: E402
+from sciqlop_tohban.timeline import View, ViewState  # noqa: E402
 
 
 @pytest.fixture
@@ -38,6 +38,6 @@ def test_none_then_all_buttons(panel):
     assert panel.state().hidden_modes == frozenset()
 
 
-def test_summary_toggle(panel):
-    panel.summary.setChecked(False)
-    assert panel.state().summary is False
+def test_view_choice(panel):
+    panel.view.setCurrentText(View.STATE.value)
+    assert panel.state().view is View.STATE

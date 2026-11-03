@@ -1,10 +1,10 @@
-"""Side panel to quickly hide instruments and modes, and switch summary/detailed view."""
+"""Side panel to quickly hide instruments and modes, and pick how the plan is drawn."""
 
 from __future__ import annotations
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
-    QCheckBox,
+    QComboBox,
     QHBoxLayout,
     QLabel,
     QListWidget,
@@ -14,7 +14,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .timeline import ViewState
+from .timeline import View, ViewState
 
 
 class CheckList(QWidget):
@@ -65,20 +65,20 @@ class FilterPanel(QWidget):
     def __init__(self, instruments: list[str], modes: list[str], parent: QWidget | None = None):
         super().__init__(parent)
         self.setWindowTitle("Tohban plan")
-        self.summary = QCheckBox("Summary: highest mode per instrument")
-        self.summary.setChecked(True)
+        self.view = QComboBox()
+        self.view.addItems([view.value for view in View])
         self.instruments = CheckList("Instruments", instruments)
         self.modes = CheckList("Modes", modes)
-        for source in (self.summary.toggled, self.instruments.changed, self.modes.changed):
+        for source in (self.view.currentIndexChanged, self.instruments.changed, self.modes.changed):
             source.connect(lambda *_: self.changed.emit(self.state()))
         layout = QVBoxLayout(self)
-        layout.addWidget(self.summary)
+        layout.addWidget(self.view)
         layout.addWidget(self.instruments, stretch=3)
         layout.addWidget(self.modes, stretch=2)
 
     def state(self) -> ViewState:
         return ViewState(
-            summary=self.summary.isChecked(),
+            view=View(self.view.currentText()),
             hidden_instruments=self.instruments.unchecked(),
             hidden_modes=self.modes.unchecked(),
         )
