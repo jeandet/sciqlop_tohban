@@ -1,7 +1,7 @@
 """Fetch the public ESA BepiColombo planning kernels Tohban needs, and only those.
 
-ESA's ``bc_plan.tm`` loads ~500 MB. MIO/MPO positions and MSASI pointing need
-~150 MB of it. Kernel file names carry their version, so a cached file never
+ESA's ``bc_plan.tm`` loads ~900 MB. MIO/MPO positions and MSASI pointing need
+~230 MB of it. Kernel file names carry their version, so a cached file never
 goes stale: a newer plan names a new file.
 """
 
@@ -26,7 +26,12 @@ _WANTED = re.compile(
     r"|ik/bc_mmo_msasi"
     r"|sclk/bc_mmo"
     r"|ck/bc_mmo_sc_"
-    r"|spk/(de\d+s|bc_sci|bc_mmo_(struct|cruise|mlt)|bc_mpo_(mlt|fcp)))"
+    # Every MIO ephemeris: ESA renames them per mission phase (mlt, now jlp + separation).
+    r"|spk/de\d+s"
+    r"|spk/bc_sci"
+    r"|spk/bc_mmo_"
+    # MPO through 2031. bc_mpo_flp (269 MB) only repeats mlt and slt_extension.
+    r"|spk/bc_mpo_(fcp|mlt|slt_extension))"
 )
 _LISTED = re.compile(r"'\$KERNELS/([^']+)'")
 

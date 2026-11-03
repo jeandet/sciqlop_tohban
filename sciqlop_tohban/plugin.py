@@ -69,7 +69,7 @@ class OpenPlan:
             self.orbit.set_intervals(select(self.intervals, state.hidden_instruments, state.hidden_modes))
 
     def _load_ephemeris(self) -> None:
-        self.view.plot.overlay.show("Loading SPICE ephemeris (first time: downloading ~150 MB of ESA kernels)…",
+        self.view.plot.overlay.show("Loading SPICE ephemeris (first time: downloading ~230 MB of ESA kernels)…",
                                     level=OverlayLevel.Info)
         self.loader = EphemerisLoader()
         self.loader.loaded.connect(self._add_orbit_views)

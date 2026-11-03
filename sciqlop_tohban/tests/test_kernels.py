@@ -19,15 +19,23 @@ ESA_MK = """\\begindata
                            '$KERNELS/sclk/bc_mmo_step_20240103.tsc'
                            '$KERNELS/sclk/bc_mpo_step_20261011.tsc'
                            '$KERNELS/spk/de432s.bsp'
-                           '$KERNELS/spk/bc_mmo_mlt_50038_20261207_20290220_v01.bsp'
-                           '$KERNELS/spk/bc_mmo_slt_extension_20290220_20310220_v01.bsp'
+                           '$KERNELS/spk/earthstns_itrf93_201023.bsp'
+                           '$KERNELS/spk/bc_sci_v02.bsp'
+                           '$KERNELS/spk/bc_mmo_struct_v01.bsp'
+                           '$KERNELS/spk/bc_mmo_cruise_v03.bsp'
+                           '$KERNELS/spk/bc_mmo_separation_20261209_20261209_v01.bsp'
+                           '$KERNELS/spk/bc_mmo_jlp_20261209_20271210_v01.bsp'
+                           '$KERNELS/spk/bc_mtm_cruise_v02.bsp'
+                           '$KERNELS/spk/bc_mpo_cog_v03.bsp'
                            '$KERNELS/spk/bc_mpo_mlt_50037_20270301_20290516_v01.bsp'
-                           '$KERNELS/spk/bc_mpo_fcp_00237_20181020_20270411_v02.bsp'
+                           '$KERNELS/spk/bc_mpo_slt_extension_20290516_20310516_v01.bsp'
+                           '$KERNELS/spk/bc_mpo_fcp_00239_20181020_20270411_v02.bsp'
                            '$KERNELS/spk/bc_mpo_flp_00233_20270309_20300101_v02.bsp'
                          )
 \\begintext
 """
 
+# bc_mpo_flp (269 MB) is left out: everything it covers is already in mlt + slt_extension.
 WANTED = [
     "ck/bc_mmo_sc_slt_50038_20261207_20290220_f20231129_v01.bc",
     "fk/bc_mmo_v14.tf",
@@ -36,14 +44,24 @@ WANTED = [
     "pck/pck00011_bc_v00.tpc",
     "sclk/bc_mmo_step_20240103.tsc",
     "spk/de432s.bsp",
-    "spk/bc_mmo_mlt_50038_20261207_20290220_v01.bsp",
+    "spk/bc_sci_v02.bsp",
+    "spk/bc_mmo_struct_v01.bsp",
+    "spk/bc_mmo_cruise_v03.bsp",
+    "spk/bc_mmo_separation_20261209_20261209_v01.bsp",
+    "spk/bc_mmo_jlp_20261209_20271210_v01.bsp",
     "spk/bc_mpo_mlt_50037_20270301_20290516_v01.bsp",
-    "spk/bc_mpo_fcp_00237_20181020_20270411_v02.bsp",
+    "spk/bc_mpo_slt_extension_20290516_20310516_v01.bsp",
+    "spk/bc_mpo_fcp_00239_20181020_20270411_v02.bsp",
 ]
 
 
 def test_keeps_only_what_mio_mpo_positions_and_msasi_pointing_need_in_load_order():
     assert wanted_kernels(ESA_MK) == WANTED
+
+
+def test_keeps_a_mio_kernel_esa_has_not_named_yet():
+    renamed = ESA_MK.replace("bc_mmo_jlp_20261209_20271210", "bc_mmo_zlp_20280101_20290101")
+    assert "spk/bc_mmo_zlp_20280101_20290101_v01.bsp" in wanted_kernels(renamed)
 
 
 def test_local_metakernel_loads_from_the_cache_folder(tmp_path):

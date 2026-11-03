@@ -37,7 +37,7 @@ The trajectory and MSASI panels redraw the part of the orbit within the timeline
 time range, and follow the mode filters. Boundaries are the Winslow et al. (2013)
 average magnetopause and bow shock.
 
-The first time, the plugin downloads ~150 MB of public ESA BepiColombo planning
+The first time, the plugin downloads ~230 MB of public ESA BepiColombo planning
 kernels into `~/.cache/sciqlop_tohban/kernels`. Set `TOHBAN_METAKERNEL` to a
 metakernel path to use your own kernel set instead.
 
