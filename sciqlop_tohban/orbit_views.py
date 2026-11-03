@@ -11,7 +11,7 @@ from typing import Callable
 
 import numpy as np
 from PySide6.QtCore import QTimer
-from SciQLop.user_api.plot import GraphLineStyle, PlotPanel, XYPlot, create_plot_panel
+from SciQLop.user_api.plot import GraphLineStyle, Orientation, PlotPanel, XYPlot, create_plot_panel
 from SciQLopPlots import PlotType as SqpPlotType
 
 from .ephemeris import Ephemeris
@@ -212,8 +212,12 @@ class OrbitViews:
         self._intervals = intervals
         self._plan_panel = plan_panel
         self.trajectory_panel = create_plot_panel("Tohban trajectory")
-        self.phase = PhasePlot(self.trajectory_panel, eph)
-        self.trajectories = [TrajectoryPlot(self.trajectory_panel, p) for p in (MSO_XZ, ORBIT_PLANE)]
+        # Each group sits in its own sub-panel: stacked next to a bare plot, a sub-panel keeps its small
+        # natural height while the plot takes the rest.
+        self.phase_panel = self.trajectory_panel.add_sub_panel(Orientation.Vertical)
+        self.phase = PhasePlot(self.phase_panel, eph)
+        self.tracks_panel = self.trajectory_panel.add_sub_panel(Orientation.Horizontal)
+        self.trajectories = [TrajectoryPlot(self.tracks_panel, p) for p in (MSO_XZ, ORBIT_PLANE)]
         self.msasi_panel = create_plot_panel("Tohban MSASI")
         self.msasi = MsasiPlots(self.msasi_panel)
         self._timer = QTimer(singleShot=True, interval=REDRAW_DELAY_MS, timeout=self.redraw)
@@ -232,8 +236,9 @@ class OrbitViews:
         eph = self._eph.window(start, stop)
         if len(eph.time) < 2:
             return
-        if alive(self.trajectory_panel):
+        if alive(self.phase_panel):
             self.phase.update(self._intervals, start, stop)
+        if alive(self.tracks_panel):
             modes = highest_mode_at(eph.time, self._intervals)
             for plot in self.trajectories:
                 plot.update(eph, modes)
