@@ -10,7 +10,7 @@ from PySide6.QtWidgets import QFileDialog, QWidget
 from shiboken6 import isValid
 from SciQLop.user_api.plot import OverlayLevel
 
-from .ephemeris import Ephemeris, sample
+from .ephemeris import Ephemeris, cached_sample
 from .evt import EvtFile, Interval, obs_mode_intervals, pair_intervals, parse
 from .filter_panel import FilterPanel
 from .kernels import metakernel
@@ -63,7 +63,7 @@ class EphemerisLoader(QObject):
 
     def _run(self, start: np.datetime64, stop: np.datetime64) -> None:
         try:
-            self.loaded.emit(sample(metakernel(), start, stop))
+            self.loaded.emit(cached_sample(metakernel(), start, stop))
         except Exception as error:  # noqa: BLE001 - any failure must reach the user, not die in the thread
             self.failed.emit(f"{type(error).__name__}: {error}")
 

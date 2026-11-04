@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import hashlib
 from contextlib import contextmanager
 from dataclasses import dataclass, fields
+from datetime import timedelta
 from pathlib import Path
 from typing import Iterator
 
 import numpy as np
+from speasy.core.cache import CacheCall
 
 STEP = np.timedelta64(5, "m")
 MSASI_FOV_ID = -68401
@@ -98,3 +101,18 @@ def sample(metakernel: Path, start: np.datetime64, stop: np.datetime64, step: np
         msasi_boresight=rotation @ (boresight / np.linalg.norm(boresight)),
         msasi_corners=np.einsum("nij,kj->nki", rotation, corners / np.linalg.norm(corners, axis=1, keepdims=True)),
     )
+
+
+def cached_sample(metakernel: Path, start: np.datetime64, stop: np.datetime64) -> Ephemeris:
+    """sample(), kept in Speasy's disk cache: reopening a plan skips the ~2 s of SPICE.
+
+    The key holds a hash of the metakernel text: ESA versions its kernel file names, so new
+    kernels change the text and miss the cache.
+    """
+    fingerprint = hashlib.sha256(metakernel.read_bytes()).hexdigest()
+    return _cached_sample(str(metakernel), fingerprint, str(start), str(stop))
+
+
+@CacheCall(cache_retention=timedelta(days=90), is_pure=True, version=1)
+def _cached_sample(metakernel: str, fingerprint: str, start: str, stop: str) -> Ephemeris:
+    return sample(Path(metakernel), np.datetime64(start), np.datetime64(stop))
