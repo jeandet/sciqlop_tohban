@@ -4,9 +4,10 @@ import threading
 from pathlib import Path
 
 import numpy as np
-from PySide6.QtCore import QObject, Signal
+from PySide6.QtCore import QObject, QSettings, Signal
 from PySide6.QtGui import QAction, QIcon
-from PySide6.QtWidgets import QFileDialog
+from PySide6.QtWidgets import QFileDialog, QWidget
+from shiboken6 import isValid
 from SciQLop.user_api.plot import OverlayLevel
 
 from .ephemeris import Ephemeris, sample
@@ -15,6 +16,7 @@ from .filter_panel import FilterPanel
 from .kernels import metakernel
 from .orbit_views import OrbitViews, add_distance_plots, alive
 from .plan_view import PlanView
+from .recent import RecentPlans
 from .resources import ICON_PATH
 from .timeline import ViewState, select
 
@@ -28,6 +30,22 @@ def read_plan(path: Path) -> EvtFile:
 def plan_intervals(evt: EvtFile) -> list[Interval]:
     intervals, points = pair_intervals(evt.records)
     return intervals + obs_mode_intervals(points, intervals)
+
+
+def side_pane_title(path: Path) -> str:
+    # ESA names every plan OBS_PLAN.evt: the folder tells two open plans apart.
+    return f"Tohban: {path.parent.name}/{path.name}"
+
+
+def show_side_pane(widget: QWidget) -> None:
+    dock = widget
+    while dock is not None and not hasattr(dock, "toggleView"):
+        dock = dock.parentWidget()
+    if dock is None:
+        return
+    dock.toggleView(True)
+    if (container := dock.autoHideDockContainer()) is not None:
+        container.collapseView(False)
 
 
 def plan_span(intervals: list[Interval]) -> tuple[np.datetime64, np.datetime64]:
@@ -106,6 +124,10 @@ class TohbanPlugin:
         self.open_action.triggered.connect(self.open_plan)
         main_window.toolsMenu.addAction(self.open_action)
         main_window.toolBar.addAction(self.open_action)
+        # QSettings() is SciQLop's own store: the application sets its organisation and name.
+        self.recent = RecentPlans(QSettings(), main_window)
+        self.recent.chosen.connect(self.open)
+        main_window.toolsMenu.addMenu(self.recent.menu)
 
     def open_plan(self) -> None:
         name, _ = QFileDialog.getOpenFileName(
@@ -115,11 +137,20 @@ class TohbanPlugin:
             self.open(Path(name))
 
     def open(self, path: Path) -> OpenPlan:
+        path = path.resolve()
+        if (plan := self._still_open(path)) is not None:
+            show_side_pane(plan.filters)
+            return plan
         plan = OpenPlan(read_plan(path))
-        plan.filters.setWindowTitle(f"Tohban: {path.name}")
+        plan.filters.setWindowTitle(side_pane_title(path))
         self._main_window.add_side_pan(plan.filters, icon=str(ICON_PATH))
         self.plans[path] = plan
+        self.recent.add(path)
         return plan
+
+    def _still_open(self, path: Path) -> OpenPlan | None:
+        plan = self.plans.get(path)
+        return plan if plan is not None and isValid(plan.filters) and alive(plan.view.panel) else None
 
     async def close(self) -> None:
         self.plans.clear()
