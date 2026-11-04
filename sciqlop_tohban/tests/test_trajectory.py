@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from sciqlop_tohban.trajectory import columns, fov_on_shell, hourly, lon_lat, mode_tracks, polylines
+from sciqlop_tohban.trajectory import columns, fov_on_shell, hourly, lon_lat, mode_tracks, night_hatching, polylines
 
 
 def test_mode_track_keeps_its_samples_and_the_next_one_so_runs_join():
@@ -45,3 +45,18 @@ def test_no_points_become_one_nan_point_since_sciqlopplots_ignores_empty_data():
 def test_columns_split_points_into_x_and_y():
     x, y = columns(np.array([[1.0, 2.0], [3.0, 4.0]]))
     assert x.tolist() == [1.0, 3.0] and y.tolist() == [2.0, 4.0]
+
+
+@pytest.mark.parametrize("sun", [(1.0, 0.0), (0.3, -0.4), (0.0, 2.0)])
+def test_night_hatching_covers_only_the_night_half_of_the_unit_disk(sun):
+    x, y = night_hatching(np.array(sun))
+    points = np.column_stack([x, y])[~np.isnan(x)]
+    towards_sun = points @ (np.array(sun) / np.hypot(*sun))
+    assert (towards_sun <= 1e-9).all()
+    assert (np.hypot(*points.T) <= 1 + 1e-9).all()
+    assert towards_sun.min() < -0.9 and towards_sun.max() > -0.1
+
+
+def test_no_night_side_when_the_plane_holds_no_sun_direction():
+    x, _ = night_hatching(np.zeros(2))
+    assert len(x) == 0

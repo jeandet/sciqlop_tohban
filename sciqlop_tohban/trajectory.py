@@ -47,6 +47,23 @@ def polylines(curves: list[np.ndarray]) -> tuple[np.ndarray, np.ndarray]:
     return joined[:, 0], joined[:, 1]
 
 
+def night_hatching(sun_xy: np.ndarray, spacing: float = 0.08) -> tuple[np.ndarray, np.ndarray]:
+    """Chords parallel to the terminator across the night half of the unit disk.
+
+    sun_xy is the Sun direction projected in the plot plane; zero means the plane holds no Sun direction.
+    simplify: hatching because SciQLopPlots 0.52 cannot fill a shape in data units; use a graph fill
+    (set_fill_between) once a SciQLopPlots release ships it.
+    """
+    norm = np.hypot(*sun_xy)
+    if norm < 1e-9:
+        return np.empty(0), np.empty(0)
+    sun = sun_xy / norm
+    along = np.array([-sun[1], sun[0]])
+    depths = np.arange(spacing / 2, 1, spacing)
+    return polylines([np.outer([-half, half], along) - depth * sun
+                      for depth, half in zip(depths, np.sqrt(1 - depths ** 2))])
+
+
 def lon_lat(points: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     lon = np.degrees(np.arctan2(points[..., 1], points[..., 0]))
     lat = np.degrees(np.arcsin(np.clip(points[..., 2] / np.linalg.norm(points, axis=-1), -1.0, 1.0)))

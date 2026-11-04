@@ -30,7 +30,7 @@ from .magnetosphere import (
 )
 from .phase import HOUR, apoapses, clip, folded_bars, power_and_obs
 from .timeline import MODE_COLORS, MODE_PRIORITY, OFF, OFF_COLOR, STATE_COLORS, View, highest_mode_at
-from .trajectory import BLANK, columns, fov_on_shell, hourly, lon_lat, mode_tracks, polylines
+from .trajectory import BLANK, columns, fov_on_shell, hourly, lon_lat, mode_tracks, night_hatching, polylines
 
 MIO_COLOR = "#7c3aed"
 MPO_COLOR = "#6b7280"
@@ -155,6 +155,14 @@ def _mercury(plot):
     return mercury
 
 
+def _night_side(plot):
+    return _curve(plot, "Mercury night side", MERCURY_COLOR)
+
+
+def _sun_direction(to_xy) -> np.ndarray:
+    return to_xy(np.array([[RM_KM, 0.0, 0.0]]))[0]
+
+
 @dataclass(frozen=True)
 class Projection:
     """How a window of ephemeris maps to plot coordinates, with the matching boundaries."""
@@ -192,6 +200,7 @@ class TrajectoryPlot:
             mode: _curve(self.plot, mode, MODE_COLORS.get(mode, OFF_COLOR), width=3) for mode in TRACK_MODES
         }
         self.hours = self.plot.scatter(*_EMPTY, labels=["MIO 1-hour marker"], colors=[HOUR_MARK_COLOR])
+        self.night = _night_side(self.plot)
         self.mercury = _mercury(self.plot)
 
     def update(self, eph: Ephemeris, modes: np.ndarray) -> None:
@@ -206,6 +215,7 @@ class TrajectoryPlot:
         _set(self.hours, marks[np.argsort(marks[:, 0])])
         _set(self.magnetopause, magnetopause)
         _set(self.bow_shock, bow_shock)
+        self.night.set_data(*night_hatching(_sun_direction(to_xy)))
 
 
 class PhasePlot:
@@ -246,6 +256,8 @@ class MsasiPlots:
         self.mio = _curve(self.cone, "MIO", MERCURY_COLOR, width=2)
         self.mpo = _curve(self.cone, "MPO", MPO_COLOR, dashed=True)
         self.shell = _curve(self.cone, f"shell R={shell_rm:g} R_M", MPO_COLOR, dashed=True)
+        self.night = _night_side(self.cone)
+        self.night.set_data(*night_hatching(np.array([1.0, 0.0])))
         self.mercury = _mercury(self.cone)
         self.rays = [_curve(self.cone, "", color) for color in FOV_COLORS]
         self.cone.legend_visible = False
