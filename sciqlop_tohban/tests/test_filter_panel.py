@@ -6,6 +6,7 @@ import pytest
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtCore import Qt  # noqa: E402
+from PySide6.QtWidgets import QProxyStyle, QStyle  # noqa: E402
 
 from sciqlop_tohban.filter_panel import FilterPanel  # noqa: E402
 from sciqlop_tohban.timeline import View, ViewState  # noqa: E402
@@ -56,6 +57,33 @@ def test_orbit_slider_selects_one_apoapsis_to_apoapsis_window(panel, qtbot):
     assert panel.orbits.slider.maximum() == 2
     with qtbot.waitSignal(panel.orbits.selected) as signal:
         panel.orbits.slider.setValue(1)
+    assert signal.args == [APOAPSES[1], APOAPSES[2]]
+
+
+class TabOnlyFocusStyle(QProxyStyle):
+    """Like desktop styles whose sliders only take focus from Tab, never from a click."""
+
+    def styleHint(self, hint, option=None, widget=None, data=None):
+        if hint == QStyle.SH_Button_FocusPolicy:
+            return int(Qt.TabFocus.value)
+        return super().styleHint(hint, option, widget, data)
+
+
+@pytest.fixture
+def tab_only_focus_style(qapp):
+    qapp.setStyle(TabOnlyFocusStyle("Fusion"))
+    yield
+    qapp.setStyle("Fusion")
+
+
+def test_orbit_slider_takes_focus_on_click_so_arrow_keys_step_orbits(tab_only_focus_style, qtbot):
+    panel = FilterPanel(["DPU"], ["BASE"])
+    qtbot.addWidget(panel)
+    panel.orbits.set_apoapses(APOAPSES)
+    assert panel.orbits.slider.focusPolicy() & Qt.ClickFocus
+    panel.orbits.slider.setFocus()
+    with qtbot.waitSignal(panel.orbits.selected) as signal:
+        qtbot.keyClick(panel.orbits.slider, Qt.Key_Right)
     assert signal.args == [APOAPSES[1], APOAPSES[2]]
 
 

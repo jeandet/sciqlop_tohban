@@ -71,6 +71,8 @@ class OrbitSlider(QWidget):
         super().__init__(parent)
         self.apoapses = np.empty(0, dtype="datetime64[s]")
         self.slider = QSlider(Qt.Horizontal, enabled=False)
+        # Some desktop styles give sliders Tab-only focus: a click then leaves the arrow keys elsewhere.
+        self.slider.setFocusPolicy(Qt.StrongFocus)
         self.slider.setPageStep(10)
         self.label = QLabel("Orbit: waiting for SPICE…")
         self.slider.valueChanged.connect(self._select)
