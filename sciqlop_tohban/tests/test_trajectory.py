@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from sciqlop_tohban.trajectory import fov_on_shell, hourly, lon_lat, mode_tracks, polylines
+from sciqlop_tohban.trajectory import columns, fov_on_shell, hourly, lon_lat, mode_tracks, polylines
 
 
 def test_mode_track_keeps_its_samples_and_the_next_one_so_runs_join():
@@ -35,3 +35,13 @@ def test_fov_on_shell_samples_evenly_and_hits_the_shell():
     picked, hits = fov_on_shell(origin, corners, radius=10.0, count=5)
     assert picked.tolist() == [0, 12, 24, 36, 49]
     assert np.linalg.norm(hits, axis=-1) == pytest.approx(np.full((5, 3), 10.0))
+
+
+def test_no_points_become_one_nan_point_since_sciqlopplots_ignores_empty_data():
+    x, y = columns(np.empty((0, 2)))
+    assert len(x) == 1 and np.isnan(x).all() and np.isnan(y).all()
+
+
+def test_columns_split_points_into_x_and_y():
+    x, y = columns(np.array([[1.0, 2.0], [3.0, 4.0]]))
+    assert x.tolist() == [1.0, 3.0] and y.tolist() == [2.0, 4.0]

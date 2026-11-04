@@ -6,6 +6,14 @@ import numpy as np
 
 from .ephemeris import shell_footprint
 
+# SciQLopPlots drops empty data and keeps drawing the old points; a lone NaN draws nothing.
+BLANK = (np.array([np.nan]), np.array([np.nan]))
+
+
+def columns(xy: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """x and y of (n, 2) points, as a graph's set_data takes them; BLANK when there are none."""
+    return (xy[:, 0], xy[:, 1]) if len(xy) else BLANK
+
 
 def mode_tracks(xy: np.ndarray, modes: np.ndarray) -> dict[str, np.ndarray]:
     """One copy of the track per mode, NaN where another mode is active.

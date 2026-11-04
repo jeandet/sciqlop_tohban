@@ -30,7 +30,7 @@ from .magnetosphere import (
 )
 from .phase import HOUR, apoapses, clip, folded_bars, power_and_obs
 from .timeline import MODE_COLORS, MODE_PRIORITY, OFF, OFF_COLOR, STATE_COLORS, View, highest_mode_at
-from .trajectory import fov_on_shell, hourly, lon_lat, mode_tracks, polylines
+from .trajectory import BLANK, columns, fov_on_shell, hourly, lon_lat, mode_tracks, polylines
 
 MIO_COLOR = "#7c3aed"
 MPO_COLOR = "#6b7280"
@@ -81,7 +81,7 @@ def _xy_plot(panel: PlotPanel, x_label: str, y_label: str, equal_aspect: bool = 
 
 
 def _set(graph, xy: np.ndarray) -> None:
-    graph.set_data(xy[:, 0], xy[:, 1]) if len(xy) else graph.set_data(*_EMPTY)
+    graph.set_data(*columns(xy))
 
 
 def _circle(radius: float) -> np.ndarray:
@@ -164,7 +164,7 @@ class PhasePlot:
     def update(self, intervals: list[Interval], start: np.datetime64, stop: np.datetime64) -> None:
         rows, bars = folded_bars(clip(intervals, start, stop), self.apoapses)
         for mode, graph in self.bars.items():
-            graph.set_data(*bars.get(mode, _EMPTY))
+            graph.set_data(*bars.get(mode, BLANK))
         self.plot.set_axis_tick_labels("y", {-float(index): lane for index, lane in enumerate(rows)})
         if rows:
             self.plot.set_axis_range("y", 0.5 - len(rows), 0.5)
@@ -198,8 +198,8 @@ class MsasiPlots:
         _set(self.shell, _circle(shell_km / RM_KM))
         for index, (rays, footprint) in enumerate(zip(self.rays, self.footprints)):
             if index >= len(picked):
-                rays.set_data(*_EMPTY)
-                footprint.set_data(*_EMPTY)
+                rays.set_data(*BLANK)
+                footprint.set_data(*BLANK)
                 continue
             origin, corners = eph.mio[picked[index], [0, 2]] / RM_KM, hits[index][:, [0, 2]] / RM_KM
             outline = np.vstack([corners, corners[:1]])
