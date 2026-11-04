@@ -105,7 +105,7 @@ def orbit_plane_basis(position: np.ndarray, velocity: np.ndarray) -> np.ndarray:
     return np.vstack([first, np.cross(normal, first)])
 
 
-def plane_section(boundary: Boundary, basis: np.ndarray, rays: int = 720, steps: int = 700) -> np.ndarray:
+def plane_section(boundary: Boundary, basis: np.ndarray, rays: int = 360, steps: int = 200) -> np.ndarray:
     """Closed (n, 2) contour where the boundary surface cuts the plane spanned by ``basis``.
 
     Each in-plane ray from Mercury's centre stops at its first crossing from

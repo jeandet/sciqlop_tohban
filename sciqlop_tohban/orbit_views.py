@@ -48,7 +48,7 @@ FOV_COLORS = (  # viridis, early to late in the shown range
     "#1e9b8a", "#2ab07f", "#52c569", "#86d549", "#c2df23", "#fde725",
 )
 # Coalesce the burst of range changes of a pan or zoom into one redraw.
-REDRAW_DELAY_MS = 150
+REDRAW_DELAY_MS = 50
 # Relative heights of the folded power and OBS plots: ~16 instrument rows against ~4.
 POWER_PHASE_STRETCH = 3
 _EMPTY = (np.empty(0), np.empty(0))
@@ -276,8 +276,7 @@ class OrbitViews:
 
     def __init__(self, plan_panel: PlotPanel, eph: Ephemeris, intervals: list[Interval], view: View):
         self._eph = eph
-        self._intervals = intervals
-        self._view = view
+        self._use_plan(intervals, view)
         self._plan_panel = plan_panel
         self.trajectory_panel = create_plot_panel("Tohban trajectory")
         # Each group sits in its own sub-panel: stacked next to a bare plot, a sub-panel keeps its small
@@ -302,9 +301,13 @@ class OrbitViews:
         self._timer.start()
 
     def set_intervals(self, intervals: list[Interval], view: View) -> None:
-        self._intervals = intervals
-        self._view = view
+        self._use_plan(intervals, view)
         self.redraw()
+
+    def _use_plan(self, intervals: list[Interval], view: View) -> None:
+        self._intervals = intervals
+        # Reduced once per filter change: over the whole plan it costs more than the rest of a redraw.
+        self._power, self._obs = power_and_obs(intervals, view)
 
     def redraw(self) -> None:
         if not alive(self._plan_panel):
@@ -315,9 +318,8 @@ class OrbitViews:
         if len(eph.time) < 2:
             return
         if alive(self.phase_panel):
-            power, obs = power_and_obs(self._intervals, self._view)
-            self.power_phase.update(power, start, stop)
-            self.obs_phase.update(obs, start, stop)
+            self.power_phase.update(self._power, start, stop)
+            self.obs_phase.update(self._obs, start, stop)
         if alive(self.tracks_panel):
             modes = highest_mode_at(eph.time, self._intervals)
             for plot in self.trajectories:
