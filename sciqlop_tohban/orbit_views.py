@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from typing import Callable
 
 import numpy as np
-from PySide6.QtCore import QTimer
+from PySide6.QtCore import QEvent, QObject, QTimer
 from SciQLop.user_api.plot import GraphLineStyle, Orientation, PlotPanel, XYPlot, create_plot_panel
 from SciQLopPlots import PlotType as SqpPlotType
 
@@ -84,6 +84,61 @@ def _xy_plot(panel: PlotPanel, x_label: str, y_label: str, equal_aspect: bool = 
     return plot
 
 
+class SquareView(QObject):
+    """Keeps a projection square and, until the user zooms, centred on Mercury showing ±half_width.
+
+    simplify: works around SciQLopPlots re-squaring a plot only when its x range changes, not after
+    a fit or a resize. Delete once SciQLopPlots does it, and let its first-data fit run again.
+    """
+
+    def __init__(self, plot: XYPlot, half_width: float):
+        super().__init__(_raw(plot))
+        self._plot = plot
+        self._half_width = half_width
+        self._home = None
+        _raw(plot).set_fit_first_data(False)
+        _raw(plot).installEventFilter(self)
+        self.go_home()
+
+    def eventFilter(self, watched, event) -> bool:
+        # Show too: a plot in a background tab is resized while hidden, when it has no layout to square.
+        if event.type() in (QEvent.Resize, QEvent.Show):
+            QTimer.singleShot(0, self, self._refresh)
+        return False
+
+    def go_home(self) -> None:
+        half = self._half_width
+        self._plot.set_axis_range("y", -half, half)
+        self._plot.set_axis_range("x", -half, half)
+        self._resquare()
+        y = self._x_or_y("y")
+        # Squared to a wide plot, y came out shorter than asked: widen x until y covers ±half.
+        stretch = 2 * half / (y[1] - y[0])
+        if stretch > 1:
+            self._plot.set_axis_range("x", -half * stretch, half * stretch)
+            self._resquare()
+        self._home = self._x_or_y("x")
+
+    def _refresh(self) -> None:
+        if not _raw(self._plot).isVisible():
+            return
+        # The axes take their new pixel size on the next replot; squaring needs it now.
+        _raw(self._plot).replot(True)
+        if self._x_or_y("x") == self._home:
+            self.go_home()
+        else:
+            self._resquare()
+
+    def _resquare(self) -> None:
+        raw = _raw(self._plot)
+        raw.set_equal_aspect_ratio(False)
+        raw.set_equal_aspect_ratio(True)
+
+    def _x_or_y(self, axis: str) -> tuple[float, float]:
+        shown = getattr(_raw(self._plot), f"{axis}_axis")().range()
+        return shown.start(), shown.stop()
+
+
 def _set(graph, xy: np.ndarray) -> None:
     graph.set_data(*columns(xy))
 
@@ -126,9 +181,10 @@ ORBIT_PLANE = Projection("apoapsis axis [R_M]", "in-plane perpendicular axis [R_
 class TrajectoryPlot:
     """MIO track coloured by the highest active operation mode, MPO, hourly marks, MP and BS."""
 
-    def __init__(self, panel: PlotPanel, projection: Projection):
+    def __init__(self, panel: PlotPanel, projection: Projection, half_width: float):
         self.projection = projection
         self.plot = _xy_plot(panel, projection.x_label, projection.y_label)
+        self.square = SquareView(self.plot, half_width)
         self.magnetopause = _curve(self.plot, "magnetopause", BOUNDARY_COLOR, width=2)
         self.bow_shock = _curve(self.plot, "bow shock", BOUNDARY_COLOR, width=2, dashed=True)
         self.mpo = _curve(self.plot, "MPO", MPO_COLOR, dashed=True)
@@ -183,11 +239,13 @@ def _fov_label(time: np.datetime64) -> str:
 class MsasiPlots:
     """MSASI FoV cone in MSO X–Z, and its footprint on a reference shell."""
 
-    def __init__(self, panel: PlotPanel):
+    def __init__(self, panel: PlotPanel, shell_rm: float):
+        self.shell_km = shell_rm * RM_KM
         self.cone = _xy_plot(panel, "MSO X [R_M]", "MSO Z [R_M]")
+        self.square = SquareView(self.cone, 1.05 * shell_rm)
         self.mio = _curve(self.cone, "MIO", MERCURY_COLOR, width=2)
         self.mpo = _curve(self.cone, "MPO", MPO_COLOR, dashed=True)
-        self.shell = _curve(self.cone, f"shell R={SHELL_RM:g} R_M", MPO_COLOR, dashed=True)
+        self.shell = _curve(self.cone, f"shell R={shell_rm:g} R_M", MPO_COLOR, dashed=True)
         self.mercury = _mercury(self.cone)
         self.rays = [_curve(self.cone, "", color) for color in FOV_COLORS]
         self.cone.legend_visible = False
@@ -196,11 +254,10 @@ class MsasiPlots:
         self.footprints = [_curve(self.footprint, "", color, width=2) for color in FOV_COLORS]
 
     def update(self, eph: Ephemeris) -> None:
-        shell_km = max(SHELL_RM * RM_KM, 1.05 * eph.mio_radius.max())
-        picked, hits = fov_on_shell(eph.mio, eph.msasi_corners, shell_km, len(FOV_COLORS))
+        picked, hits = fov_on_shell(eph.mio, eph.msasi_corners, self.shell_km, len(FOV_COLORS))
         _set(self.mio, eph.mio[:, [0, 2]] / RM_KM)
         _set(self.mpo, eph.mpo[:, [0, 2]] / RM_KM)
-        _set(self.shell, _circle(shell_km / RM_KM))
+        _set(self.shell, _circle(self.shell_km / RM_KM))
         for index, (rays, footprint) in enumerate(zip(self.rays, self.footprints)):
             if index >= len(picked):
                 rays.set_data(*BLANK)
@@ -233,9 +290,11 @@ class OrbitViews:
         # Without its own stretch, Qt shrinks the OBS plot to its minimum height.
         self.phase_panel._impl.set_plot_stretch(self.obs_phase.plot._impl, 1)
         self.tracks_panel = self.trajectory_panel.add_sub_panel(Orientation.Horizontal)
-        self.trajectories = [TrajectoryPlot(self.tracks_panel, p) for p in (MSO_XZ, ORBIT_PLANE)]
+        farthest = max(eph.mio_radius.max(), eph.mpo_radius.max()) / RM_KM
+        self.trajectories = [TrajectoryPlot(self.tracks_panel, p, 1.1 * farthest) for p in (MSO_XZ, ORBIT_PLANE)]
         self.msasi_panel = create_plot_panel("Tohban MSASI")
-        self.msasi = MsasiPlots(self.msasi_panel)
+        # One shell for the whole plan, reaching past MIO's farthest point so every FoV edge hits it.
+        self.msasi = MsasiPlots(self.msasi_panel, max(SHELL_RM, round(1.05 * farthest, 1)))
         self._timer = QTimer(singleShot=True, interval=REDRAW_DELAY_MS, timeout=self.redraw)
         plan_panel._impl.time_range_changed.connect(lambda _: self._timer.start())
         self.redraw()
