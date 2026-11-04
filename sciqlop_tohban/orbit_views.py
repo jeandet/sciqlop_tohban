@@ -224,9 +224,9 @@ class OrbitViews:
         # Each group sits in its own sub-panel: stacked next to a bare plot, a sub-panel keeps its small
         # natural height while the plot takes the rest.
         self.phase_panel = self.trajectory_panel.add_sub_panel(Orientation.Vertical)
-        apo = apoapses(eph.time, eph.mio_radius)
-        self.power_phase = PhasePlot(self.phase_panel, apo, "power")
-        self.obs_phase = PhasePlot(self.phase_panel, apo, "OBS mode", "hours since MIO apoapsis")
+        self.apoapses = apoapses(eph.time, eph.mio_radius)
+        self.power_phase = PhasePlot(self.phase_panel, self.apoapses, "power")
+        self.obs_phase = PhasePlot(self.phase_panel, self.apoapses, "OBS mode", "hours since MIO apoapsis")
         self.phase_panel._impl.set_plot_stretch(self.power_phase.plot._impl, POWER_PHASE_STRETCH)
         # Without its own stretch, Qt shrinks the OBS plot to its minimum height.
         self.phase_panel._impl.set_plot_stretch(self.obs_phase.plot._impl, 1)

@@ -28,6 +28,11 @@ def apoapses(time: np.ndarray, radius: np.ndarray) -> np.ndarray:
     return np.concatenate([[times[0] - period], times, [times[-1] + period]])
 
 
+def orbit_containing(apo: np.ndarray, time: np.datetime64) -> int:
+    """Index of the orbit (apoapsis ``i`` to ``i + 1``) holding ``time``, clamped to the known orbits."""
+    return int(np.clip(np.searchsorted(apo, time, side="right") - 1, 0, len(apo) - 2))
+
+
 def fold(start: np.datetime64, stop: np.datetime64, apo: np.ndarray) -> list[tuple[float, float]]:
     """[start, stop] as (from, to) hours since apoapsis, one piece per orbit it spans."""
     edges = np.concatenate([[start], apo[(apo > start) & (apo < stop)], [stop]])

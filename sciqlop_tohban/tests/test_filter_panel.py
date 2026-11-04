@@ -1,5 +1,6 @@
 import os
 
+import numpy as np
 import pytest
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
@@ -41,3 +42,26 @@ def test_none_then_all_buttons(panel):
 def test_view_choice(panel):
     panel.view.setCurrentText(View.STATE.value)
     assert panel.state().view is View.STATE
+
+
+APOAPSES = np.datetime64("2030-01-01T00:00:00") + np.array([0, 10, 20, 30]) * np.timedelta64(1, "h")
+
+
+def test_orbit_slider_waits_for_the_ephemeris(panel):
+    assert not panel.orbits.slider.isEnabled()
+
+
+def test_orbit_slider_selects_one_apoapsis_to_apoapsis_window(panel, qtbot):
+    panel.orbits.set_apoapses(APOAPSES)
+    assert panel.orbits.slider.maximum() == 2
+    with qtbot.waitSignal(panel.orbits.selected) as signal:
+        panel.orbits.slider.setValue(1)
+    assert signal.args == [APOAPSES[1], APOAPSES[2]]
+
+
+def test_orbit_slider_follows_the_shown_time_silently(panel, qtbot):
+    panel.orbits.set_apoapses(APOAPSES)
+    with qtbot.assertNotEmitted(panel.orbits.selected):
+        panel.orbits.follow(APOAPSES[2] + np.timedelta64(5, "h"))
+    assert panel.orbits.slider.value() == 2
+    assert "3 / 3" in panel.orbits.label.text()

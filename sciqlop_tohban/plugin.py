@@ -87,6 +87,14 @@ class OpenPlan:
         self.orbit = OrbitViews(
             self.view.panel, eph, select(self.intervals, state.hidden_instruments, state.hidden_modes), state.view
         )
+        self._add_orbit_stepper()
+
+    def _add_orbit_stepper(self) -> None:
+        orbits = self.filters.orbits
+        orbits.set_apoapses(self.orbit.apoapses)
+        orbits.follow(self.view.middle())
+        orbits.selected.connect(self.view.show_window)
+        self.view.panel._impl.time_range_changed.connect(lambda _: orbits.follow(self.view.middle()))
 
 
 class TohbanPlugin:

@@ -47,6 +47,13 @@ class PlanView:
         present = {display_mode(i.mode) for i in self._intervals}
         return [m for m in CATEGORY_ORDER if m in present] + sorted(present - set(CATEGORY_ORDER))
 
+    def show_window(self, start: np.datetime64, stop: np.datetime64) -> None:
+        self.panel.time_range = TimeRange(_epoch_seconds(start), _epoch_seconds(stop))
+
+    def middle(self) -> np.datetime64:
+        shown = self.panel.time_range
+        return np.datetime64(int((shown.start() + shown.stop()) / 2), "s")
+
     def show(self, state: ViewState) -> None:
         data = view_data(self._intervals, state)
         self.timeline.stack = "category" if state.view is View.DETAILED else None

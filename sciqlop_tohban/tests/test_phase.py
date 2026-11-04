@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 from sciqlop_tohban.evt import Interval
-from sciqlop_tohban.phase import apoapses, clip, fold, folded_bars, power_and_obs
+from sciqlop_tohban.phase import apoapses, clip, fold, folded_bars, orbit_containing, power_and_obs
 from sciqlop_tohban.timeline import ON, SCIENCE, View
 
 T0 = np.datetime64("2030-01-01T00:00:00")
@@ -68,3 +68,13 @@ def test_power_rows_show_the_highest_mode_outside_the_state_view():
     for view in (View.SUMMARY, View.DETAILED):
         power, _ = power_and_obs(intervals, view)
         assert [i.mode for i in power] == ["BASE", "LM", "BASE"]
+
+
+def test_orbit_containing_counts_from_the_previous_apoapsis():
+    apo = hours(0, 10, 20, 30)
+    assert [orbit_containing(apo, t) for t in hours(0, 9, 10, 25)] == [0, 0, 1, 2]
+
+
+def test_orbit_containing_clamps_outside_the_known_orbits():
+    apo = hours(0, 10, 20, 30)
+    assert [orbit_containing(apo, t) for t in hours(-5, 30, 99)] == [0, 2, 2]
