@@ -72,13 +72,14 @@ def alive(panel: PlotPanel) -> bool:
 
 
 def _xy_plot(panel: PlotPanel, x_label: str, y_label: str, equal_aspect: bool = True,
-             follow_data: bool = True) -> XYPlot:
+             follow_data: bool = False) -> XYPlot:
     # user_api only creates an XY plot together with its first graph; start empty instead.
     plot = XYPlot(panel._impl.create_plot(-1, SqpPlotType.BasicXY))
     plot.set_axis_label("x", x_label)
     plot.set_axis_label("y", y_label)
     _raw(plot).set_equal_aspect_ratio(equal_aspect)
-    # Otherwise the axes only fit the first data, and later windows are drawn off-screen.
+    # follow_data refits the axes on every redraw: needed where each window lands elsewhere (lon/lat
+    # footprint), unwanted on the projections, where it would undo the user's zoom on each orbit.
     _raw(plot).set_auto_scale(follow_data)
     return plot
 
@@ -158,7 +159,7 @@ class PhasePlot:
 
     def __init__(self, panel: PlotPanel, apo: np.ndarray, y_label: str, x_label: str = ""):
         self.apoapses = apo
-        self.plot = _xy_plot(panel, x_label, y_label, equal_aspect=False, follow_data=False)
+        self.plot = _xy_plot(panel, x_label, y_label, equal_aspect=False)
         colors = MODE_COLORS | STATE_COLORS
         self.bars = {mode: _curve(self.plot, mode, color, width=self.BAR_WIDTH) for mode, color in colors.items()}
         # Same colours as the trajectory legend below; this one would hide the bars.
@@ -190,7 +191,8 @@ class MsasiPlots:
         self.mercury = _mercury(self.cone)
         self.rays = [_curve(self.cone, "", color) for color in FOV_COLORS]
         self.cone.legend_visible = False
-        self.footprint = _xy_plot(panel, "Mercury-centred longitude [deg]", "latitude [deg]", equal_aspect=False)
+        self.footprint = _xy_plot(panel, "Mercury-centred longitude [deg]", "latitude [deg]", equal_aspect=False,
+                                  follow_data=True)
         self.footprints = [_curve(self.footprint, "", color, width=2) for color in FOV_COLORS]
 
     def update(self, eph: Ephemeris) -> None:
